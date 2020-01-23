@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:v-on="http://www.w3.org/1999/xhtml">
+{% load static %}
+<head>
+    <meta charset="UTF-8">
+    <title>ArchTube</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+            integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+            crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+            integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+            crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css"
+          integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
+</head>
+<body class="bg-dark">
+<div id="app">
+    <template>
+        <div class="m-0 p-0 row" v-show="current_video == null">
+            <div class="col p-0">
+                <nav class="border-bottom navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+                    <a class="navbar-brand" href="#">ArchTube</a>
+                    <button class="navbar-toggler" type="button" data-toggle="collapse"
+                            data-target="#navbarSupportedContent"
+                            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+
+                    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                        <ul class="navbar-nav mr-auto">
+                            <li :class="['nav-item', mode == 'channels' ? 'active' : '']">
+                                <a class="nav-link" href="javascript:;" v-on:click="switchToChannels()">Channels</a>
+                            </li>
+                            <li :class="['nav-item', mode == 'videos' ? 'active' : '']">
+                                <a class="nav-link" href="javascript:;" v-on:click="switchToVideos()">Videos</a>
+                            </li>
+                        </ul>
+                        <form onsubmit="return false" class="form-inline my-2 my-lg-0">
+                            <select class="mr-1 form-control" v-model="vinclude">
+                                <option value="all">ALL</option>
+                                <option value="yt">YT</option>
+                                <option value="nonyt">NON</option>
+                            </select>
+                            <select v-if="mode == 'videos'" class="mr-1 form-control" v-model="vchannelsort">
+                                <option value="created">CREATED</option>
+                                <option value="oldest">OLDEST</option>
+                                <option value="newest">NEWEST</option>
+                            </select>
+                            <select v-if="mode == 'channels'" class="mr-1 form-control" v-model="vchannellistsort">
+                                <option value="updated">UPDATED</option>
+                                <option value="count">VIDEO COUNT</option>
+                            </select>
+                            <input v-model="filter_term" v-on:change="triggerTermSearch" class="form-control mr-sm-2"
+                                   type="search" placeholder="Search" aria-label="Search">
+                            <button class="btn btn-outline-success my-2 my-sm-0" type="button"
+                                    v-on:click="triggerTermSearch">Search
+                            </button>
+                        </form>
+                    </div>
+                </nav>
+            </div>
+        </div>
+        <div v-if="mode == 'videos'" class="container-fluid p-2">
+            <div class="row m-0">
+                <div v-on:click="playVideoAndSavePos(index)" class="col-md-3 video" v-for="(video, index) in videos">
+                    <div class="video-info mx-auto">
+                        <div :title="video.path" v-if="video.info" class="video-thumb"
+                             :style="{'backgroundImage': 'url(' + getThumbUrl(video) + ')'}"></div>
+                        <div :title="video.path" v-else-if="video.alt_thumb" class="video-thumb"
+                             :style="{'backgroundImage': 'url(' + getAltThumbUrl(video) + ')'}"></div>
+                        <p class="video-title" v-if="video.info">{% verbatim %}{{ video.info.snippet.title }}{% endverbatim %}</p>
+                        <p class="video-title" v-else>{% verbatim %}{{ video.path }}{% endverbatim %}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center m-5">
+                <button type="button" class="btn btn-outline-success btn-dark btn-lg" v-on:click="loadPrevVideos({skip: 5})">Prev
+                </button>
+                <button type="button" class="btn btn-outline-success btn-dark btn-lg" style="margin-right: 10px"
+                        v-on:click="loadPrevVideos">{% verbatim %}{{ 'Prev (' + (page - 1) + ')' }}{% endverbatim %}
+                </button>
+                <button type="button" class="btn btn-outline-success btn-dark btn-lg" v-on:click="loadNextVideos">{% verbatim %}{{ 'Next (' + (page + 1) + ')' }}{% endverbatim %}
+                </button>
+                <button type="button" class="btn btn-outline-success btn-dark btn-lg" v-on:click="loadNextVideos({skip: 5})">Next
+                </button>
+            </div>
+        </div>
+        <div v-else>
+            <div class="row m-0">
+                <div class="col-md-3 channel" v-for="(channel, index) in channels">
+                    <div class="channel-info mx-auto" v-on:click="triggerChannelSearch(index)">
+                        <div class="video-thumb" :style="{'backgroundImage': 'url(' + channel['thumb'] + ')'}">
+                            <i class="fa fa-info-circle m-2 text-white" v-on:click="openChannelPage(channel)"></i>
+                        </div>
+                        <p class="channel-title">{% verbatim %}{{ channel.title }}{% endverbatim %}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center m-5">
+                <button type="button" class="btn btn-outline-success btn-dark btn-lg" v-on:click="loadPrevChannels({skip: 5})">Prev
+                </button>
+                <button type="button" class="btn btn-outline-success btn-dark btn-lg" style="margin-right: 10px"
+                        v-on:click="loadPrevChannels">{% verbatim %}{{ 'Prev (' + (channel_page - 1) + ')' }}{% endverbatim %}
+                </button>
+                <button type="button" class="btn btn-outline-success btn-dark btn-lg" v-on:click="loadNextChannels">{% verbatim %}{{ 'Next (' + (channel_page + 1) + ')' }}{% endverbatim %}
+                </button>
+                <button type="button" class="btn btn-outline-success btn-dark btn-lg" v-on:click="loadNextChannels({skip: 5})">Next
+                </button>
+            </div>
+        </div>
+    </template>
+    <template v-if="current_video != null">
+        <div id="player-container">
+            <div class="control-bar" v-on:click="prevVideo"></div>
+            <div class="control-bar" style="right: 0px" v-on:click="nextVideo"></div>
+            <div v-if="playerButtonsShown" id="play-buttons-container">
+                <div class="player-button fa fa-sync" v-on:click="rotateVideo"></div>
+                <div class="player-button fa fa-expand"
+                     v-on:click="fullscreenVideo"></div>
+                <div class="player-button fa fa-times"
+                     v-on:click="stopVideo"></div>
+                <div class="player-button fa fa-gamepad"
+                     v-on:click="toggleControls"></div>
+                <div v-if="current_video.info" class="player-button fa fa-tv"
+                     v-on:click="searchCurrentChannel"></div>
+                <div v-if="current_video.video_id" class="player-button fa fa-video"
+                     v-on:click="openYoutubePage"></div>
+            </div>
+            <video ref="video" autoplay="true" loop>
+                <track :src="getSubUrl(current_video)" kind="captions" srclang="en-US" label="English" default/>
+            </video>
+        </div>
+    </template>
+</div>
+<script type="text/javascript">
+    {% autoescape off %}
+        var archtube_drives = {{ drives }};
+    {% endautoescape %}
+</script>
+<script type="text/javascript" src="{% static 'app.js' %}"></script>
+</body>
+</html>
