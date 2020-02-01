@@ -1,7 +1,9 @@
+import platform
 import string
 import subprocess
 import time
-from ctypes import windll
+if platform.uname()[0] == 'Windows':
+    from ctypes import windll
 from functools import reduce
 from threading import Thread
 from threading import enumerate as enumf
@@ -9,16 +11,18 @@ from threading import enumerate as enumf
 import googleapiclient.discovery
 import googleapiclient.errors
 import argparse
+
 import os
 import re
 import json
+from archpath import archpath
 from itertools import islice
 
 import math
 
 api_service_name = 'youtube'
 api_version = 'v3'
-devKey = None
+devKey = 'AIzaSyC1Nch_SY_YeXLavDizke0QtTkUyJgVadI'
 logfile = '.ytcataloger.json'
 infofile = '.ytcataloger-info.json'
 
@@ -58,24 +62,24 @@ def writelog(videos, pathkey):
 def gen_fake_thumbs(videos):
     for video in videos:
         try:
-            folders = video['path'].split("\\")
+            folders = archpath.split(video['path'])
             output_path = "static"
             for folder in folders[0:-1]:
                 if len(folder) == 2 and folder[1:] == ':':
-                    output_path = os.path.join(output_path, folder[0])
+                    output_path = archpath.join(output_path, folder[0])
                 else:
-                    output_path = os.path.join(output_path, folder)
+                    output_path = archpath.join(output_path, folder)
             command = 'ffprobe -v quiet -print_format json -show_format -show_streams "%s"' % video['path']
-            out = subprocess.check_output(command)
+            out = subprocess.check_output(command, shell=True)
             j = json.loads(out)
             duration = math.floor(float(j['format']['duration']))
             capture_time = math.floor(duration/2)
-            basename = os.path.basename(video['path'])
-            output_file = os.path.join(output_path, basename + '.png')
+            basename = archpath.basename(video['path'])
+            output_file = archpath.join(output_path, basename + '.png')
             command = 'ffmpeg -y -ss %s -i "%s" -frames:v 1 "%s"' % (capture_time, video['path'], output_file)
-            if not os.path.isdir(output_path):
+            if not archpath.isdir(output_path):
                 os.makedirs(output_path)
-            picproduced = subprocess.call(command, stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'))
+            picproduced = subprocess.call(command, stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'), shell=True)
             assert picproduced == 0
             video['alt_thumb'] = output_file
             print('Generated thumb for %s' % video['path'])
@@ -128,7 +132,7 @@ def process_videos(videos, drive, gen_thumbs):
 
 def write_drive_log(drive, tempvideos):
     # return
-    with open(os.path.join(drive, logfile), 'w') as f:
+    with open(archpath.join(drive, logfile), 'w') as f:
         f.write(json.dumps({
             'videos': tempvideos,
             'drive': drive
@@ -149,18 +153,23 @@ def main():
 
     if args.drives is not None and len(args.drives) > 0:
         for drive in args.drives:
-            if not os.path.ismount(drive):
+            if not archpath.ismount(drive):
                 raise Exception("Invalid mount point passed")
-            if not os.path.isdir(drive):
+            if not archpath.isdir(drive):
                 raise Exception("Invalid drive passed")
             drives.append(drive)
-    else:
-        bitmask = windll.kernel32.GetLogicalDrives()
+    elif platform.uname()[0] == 'Windows':
+        bitmask = archpath.get_drives()
         for letter in string.ascii_uppercase:
             if bitmask & 1:
-                if os.path.isfile(os.path.join(letter + ':\\', '.ytcataloger.json')):
-                    drives.append(letter + ':\\')
+                if archpath.isfile(archpath.join(archpath.format_mount_point(letter), '.ytcataloger.json')):
+                    drives.append(archpath.format_mount_point(letter))
             bitmask >>= 1
+    else:
+        # do linux stuff
+        # I didn't quite get what the goal is here, so ¯\_(ツ)_/¯
+        pass
+
 
     video_file_pattern = re.compile(r'(-(.{11}))?\.(mp4|mkv|webm|ts|m2ts)$')
     dataset = {}
@@ -168,9 +177,9 @@ def main():
 
     for drive in drives:
         log("Processing drive %s" % drive)
-        logfilepath = os.path.join(drive, logfile)
+        logfilepath = archpath.join(drive, logfile)
         tempvideos = []
-        if os.path.isfile(logfilepath):
+        if archpath.isfile(logfilepath):
             with open(logfilepath, 'r') as f:
                 json_data = json.loads(f.read())
                 if json_data.get('drive') != drive:
@@ -180,7 +189,7 @@ def main():
                 log("Read files from log for %s" % drive)
                 # continue
         # for index, video in enumerate(tempvideos):
-        #     if not os.path.isfile(video['path']):
+        #     if not archpath.isfile(video['path']):
         #         tempvideos.pop(index)
         scanpath = drive
         if args.startpaths is not None:
@@ -189,15 +198,15 @@ def main():
                     scanpath = path
                     break
         if scanpath == drive or args.force_clean_missing:
-            missingfiles = filter(lambda x: not os.path.isfile(x['path']), tempvideos)
+            missingfiles = filter(lambda x: not archpath.isfile(x['path']), tempvideos)
             for missingfile in missingfiles:
                 print(missingfile['path'])
-            tempvideos = list(filter(lambda x: os.path.isfile(x['path']), tempvideos))
+            tempvideos = list(filter(lambda x: archpath.isfile(x['path']), tempvideos))
             log("Cleaned missing files")
         for root, curdir, files in os.walk(scanpath):
             for file in files:
                 m = re.search(video_file_pattern, file)
-                abspath_file = os.path.join(root, file)
+                abspath_file = archpath.join(root, file)
                 if m is not None:
                     vid = m.group(2)
                     if vid is not None:
@@ -211,7 +220,7 @@ def main():
                     tempvideos.append({
                         'path': abspath_file,
                         'video_id': vid,
-                        'size': os.path.getsize(abspath_file)
+                        'size': archpath.getsize(abspath_file)
                     })
         write_drive_log(drive, tempvideos)
         dataset[drive] = tempvideos.copy()
