@@ -42,6 +42,13 @@
                             </li>
                         </ul>
                         <form onsubmit="return false" class="form-inline my-2 my-lg-0">
+                            <select class="mr-1 form-control" v-model="quality_filter">
+                                <option value="all">ALL</option>
+                                <option value="UHD+">UHD</option>
+                                <option value="FHD">FHD</option>
+                                <option value="HD">HD</option>
+                                <option value="SD">SD</option>
+                            </select>
                             <select class="mr-1 form-control" v-model="vinclude">
                                 <option value="all">ALL</option>
                                 <option value="yt">YT</option>
@@ -70,6 +77,7 @@
             <div class="row m-0">
                 <div v-on:click="playVideoAndSavePos(index)" class="col-md-3 video" v-for="(video, index) in videos">
                     <div class="video-info mx-auto">
+                        <div class="quality-label" v-if="video.codec">{% verbatim %}{{ video.codec.label }}{% endverbatim %}</div>
                         <div :title="video.path" v-if="video.info" class="video-thumb"
                              :style="{'backgroundImage': 'url(' + getThumbUrl(video) + ')'}"></div>
                         <div :title="video.path" v-else-if="video.alt_thumb" class="video-thumb"

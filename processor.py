@@ -18,7 +18,7 @@ import math
 
 api_service_name = 'youtube'
 api_version = 'v3'
-devKey = None
+devKey = 'AIzaSyA5NrZQxvml_MivurIHbstNYLd38PxdWPQ'
 logfile = '.ytcataloger.json'
 infofile = '.ytcataloger-info.json'
 
@@ -69,7 +69,7 @@ def gen_fake_thumbs(videos):
             out = subprocess.check_output(command)
             j = json.loads(out)
             duration = math.floor(float(j['format']['duration']))
-            capture_time = math.floor(duration/2)
+            capture_time = math.floor(duration / 2)
             basename = os.path.basename(video['path'])
             output_file = os.path.join(output_path, basename + '.png')
             command = 'ffmpeg -y -ss %s -i "%s" -frames:v 1 "%s"' % (capture_time, video['path'], output_file)
@@ -84,8 +84,75 @@ def gen_fake_thumbs(videos):
             print('Thumb not generated for %s' % video['path'])
 
 
-def process_videos(videos, drive, gen_thumbs):
+def get_video_quality_label(video_width):
+    if video_width < 1200:
+        return 'SD'
+    elif video_width < 1920:
+        return 'HD'
+    elif video_width < 3800:
+        return 'FHD'
+    else:
+        return 'UHD+'
+
+
+def get_video_codec_info(video_with_no_info):
+    command = 'ffprobe -i "{}" -show_streams -select_streams v -print_format json -v quiet'.format(
+        video_with_no_info['path'])
+    out = subprocess.check_output(command, shell=True)
+    assert out is not None
+    data = json.loads(out.decode('utf-8'))
+    if len(data['streams']) < 1:
+        return None
+    return {
+        'width': data['streams'][0]['width'],
+        'height': data['streams'][0]['height'],
+        'label': get_video_quality_label(data['streams'][0]['width']),
+    }
+
+
+def process_videos_for_codec(videos, drive, gen_thumbs, startpaths):
+    scanpath = drive
+    if startpaths is not None:
+        for path in startpaths:
+            if path[0:3] == drive:
+                scanpath = path
+                break
+
+    videos_without_info = filter(lambda x: 'codec' not in x and x['path'].startswith(scanpath), videos)
+    remaining = len(videos)
+    # log("Queued for video info: {}".format(len(videos_without_info)))
+
+    MAX_THREAD_COUNT = 10
+    CURRENT_THREAD_COUNT = 0
+
+    def info_processor(video):
+        nonlocal CURRENT_THREAD_COUNT
+        nonlocal remaining
+        try:
+            video['codec'] = get_video_codec_info(video_with_no_info)
+            # remaining = remaining - len(set)
+        except Exception as e:
+            print("Could not resolve info with ffprobe {}".format(str(e)))
+            video['codec'] = None
+        CURRENT_THREAD_COUNT = CURRENT_THREAD_COUNT - 1
+
+    setc = 0
+    for video_with_no_info in videos_without_info:
+        while CURRENT_THREAD_COUNT > MAX_THREAD_COUNT:
+            time.sleep(2)
+        setc += 1
+        CURRENT_THREAD_COUNT = CURRENT_THREAD_COUNT + 1
+        Thread(target=info_processor, args=(video_with_no_info,)).start()
+
+    while CURRENT_THREAD_COUNT > 0:
+        time.sleep(5)
+
+    write_drive_log(drive, videos)
+
+
+def process_videos(videos, drive, gen_thumbs, startpaths):
     videos_without_info = filter(lambda x: 'info' not in x and x['video_id'] is not None, videos)
+    videos_without_info = filter(lambda x: not os.path.exists(os.path.join(os.path.dirname(x['path']), '.nomedia')), videos_without_info)
     video_chunks = chunk(videos_without_info, 50)
     remaining = len(videos)
 
@@ -120,7 +187,15 @@ def process_videos(videos, drive, gen_thumbs):
     while CURRENT_THREAD_COUNT > 0:
         time.sleep(5)
     if gen_thumbs:
-        videos_with_empty_info = filter(lambda x: 'alt_thumb' not in x and ('info' not in x or x['info'] is None), videos)
+        videos_with_empty_info = filter(lambda x: 'alt_thumb' not in x and ('info' not in x or x['info'] is None),
+                                        videos)
+        scanpath = drive
+        if startpaths is not None:
+            for path in startpaths:
+                if path[0:3] == drive:
+                    scanpath = path
+                    break
+        videos_with_empty_info = filter(lambda x: x['path'].startswith(scanpath), videos_with_empty_info)
         gen_fake_thumbs(videos_with_empty_info)
 
     write_drive_log(drive, videos)
@@ -141,6 +216,7 @@ def main():
     parser.add_argument("-startpaths", nargs="+")
     parser.add_argument("-no_gen_thumbs", action='store_true')
     parser.add_argument("-force_clean_missing", action='store_true')
+    parser.add_argument("-no_youtube_fetch", action='store_true')
     args = parser.parse_args()
     drives = []
 
@@ -221,7 +297,9 @@ def main():
 
     totsize = 0
     for drive in dataset:
-        process_videos(dataset[drive], drive, args.no_gen_thumbs is False)
+        if args.no_youtube_fetch is False:
+            process_videos(dataset[drive], drive, args.no_gen_thumbs is False, args.startpaths)
+        process_videos_for_codec(dataset[drive], drive, args.no_gen_thumbs is False, args.startpaths)
         for v in dataset[drive]:
             totsize += v.get('size')
         # break

@@ -23,18 +23,20 @@ class DataPipe:
         print('Caching %s' % drives)
         self.videos[drives] = []
         for drive in drives.split(','):
+            print('Caching {}'.format(drive))
             infofilepath = os.path.join(drive, self.infofile)
             with open(infofilepath, 'r') as f:
                 if self.vinclude == 'yt':
                     self.videos[drives] += list(
                         filter(lambda x: x['video_id'] is not None, json.loads(f.read()).get('videos')))
                     # self.videos[drives].sort(key=lambda v: v['info']['snippet']['publishedAt'] if 'info' in v and v['info'] is not None else '1970-01-01T17:02:47.000Z', reverse=True)
-                    self.videos[drives].sort(key=lambda v: os.path.getctime(v['path']), reverse=True)
+
                 elif self.vinclude == 'nonyt':
                     self.videos[drives] += list(
                         filter(lambda x: 'alt_thumb' in x, json.loads(f.read()).get('videos')))
                 else:
                     self.videos[drives] += json.loads(f.read()).get('videos')
+                self.videos[drives].sort(key=lambda v: self.getctime(v['path']), reverse=True)
 
     def load_videos_by_term(self, drives, term):
         if drives in self.videos_by_term and term in self.videos_by_term[drives]:
@@ -55,7 +57,7 @@ class DataPipe:
             self.videos_by_channel[drives][channel_id].sort(key=lambda v: v['info']['snippet']['publishedAt'],
                                                             reverse=True)
         elif sort == 'created':
-            self.videos_by_channel[drives][channel_id].sort(key=lambda v: os.path.getctime(v['path']), reverse=True)
+            self.videos_by_channel[drives][channel_id].sort(key=lambda v: self.getctime(v['path']), reverse=True)
 
     def load_videos_by_channel(self, drives, channel_id, vchannelsort):
         if drives in self.videos_by_channel and channel_id in self.videos_by_channel[drives]:
@@ -69,25 +71,32 @@ class DataPipe:
         self.videos_by_channel[drives][channel_id].sort(key=lambda v: v['info']['snippet']['publishedAt'])
         self.sort_videos_by_channels(drives, channel_id, vchannelsort)
 
-    def list_videos(self, drives, page, count):
+    def videos_after_quality_filter(self, videos, quality_filter):
+        if quality_filter != 'all':
+            return list(
+                filter(lambda x: 'codec' in x and x['codec'] is not None and x['codec']['label'] == quality_filter,
+                       videos))
+        return videos
+
+    def list_videos(self, drives, page, count, quality_filter='all'):
         self.load_videos(drives)
         start = (page - 1) * count
         end = start + count
-        return self.videos[drives][start:end]
+        return self.videos_after_quality_filter(self.videos[drives], quality_filter)[start:end]
 
-    def list_videos_by_term(self, drives, term, page, count):
+    def list_videos_by_term(self, drives, term, page, count, quality_filter='all'):
         self.load_videos(drives)
         self.load_videos_by_term(drives, term)
         start = (page - 1) * count
         end = start + count
-        return self.videos_by_term[drives][term][start:end]
+        return self.videos_after_quality_filter(self.videos_by_term[drives][term], quality_filter)[start:end]
 
-    def list_videos_by_channel(self, drives, channel_id, vchannelsort, page, count):
+    def list_videos_by_channel(self, drives, channel_id, vchannelsort, page, count, quality_filter='all'):
         self.load_videos(drives)
         self.load_videos_by_channel(drives, channel_id, vchannelsort)
         start = (page - 1) * count
         end = start + count
-        return self.videos_by_channel[drives][channel_id][start:end]
+        return self.videos_after_quality_filter(self.videos_by_channel[drives][channel_id], quality_filter)[start:end]
 
     # channels ops
 
@@ -109,7 +118,10 @@ class DataPipe:
         self.channel_counts[drives] = {}
         for v in self.videos[drives]:
             if v['info'] is not None:
-                self.channel_counts[drives][v['info']['snippet']['channelId']] = 1 if v['info']['snippet']['channelId'] not in self.channel_counts[drives] else self.channel_counts[drives][v['info']['snippet']['channelId']] + 1
+                self.channel_counts[drives][v['info']['snippet']['channelId']] = 1 if v['info']['snippet'][
+                                                                                          'channelId'] not in \
+                                                                                      self.channel_counts[drives] else \
+                    self.channel_counts[drives][v['info']['snippet']['channelId']] + 1
                 if v['info']['snippet']['channelId'] not in processed:
                     processed.append(v['info']['snippet']['channelId'])
                     self.channels[drives].append({
@@ -141,3 +153,9 @@ class DataPipe:
         start = (page - 1) * count
         end = start + count
         return self.channels_by_term[drives][term][start:end]
+
+    def getctime(self, path):
+        try:
+            return os.path.getctime(path)
+        except:
+            return 0

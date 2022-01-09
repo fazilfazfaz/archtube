@@ -22,8 +22,12 @@ faz = new Vue({
         playerButtonsShownTimer: null,
         vchannelsort: 'oldest',
         vchannellistsort: 'updated',
+        quality_filter: 'all',
     },
     watch: {
+        quality_filter: function() {
+            this.listVideos();
+        },
         'vchannelsort': function() {
             this.retriggerChannelSearch();
         }
@@ -77,6 +81,9 @@ faz = new Vue({
             if(this.current_video == null) {
                 return;
             }
+            this.$refs.video.pause();
+            this.$refs.video.removeAttribute('src');
+            this.$refs.video.load();
             this.current_video = null;
             this.current_video_index = 0;
 //            if(this.lastScrollTop != null) {
@@ -207,6 +214,7 @@ faz = new Vue({
                 count: this.count,
                 drives: this.drives,
                 vinclude: this.vinclude,
+                quality_filter: this.quality_filter,
             };
             switch(this.video_listing_method) {
                 case 'term_filter':

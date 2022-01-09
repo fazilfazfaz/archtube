@@ -1,7 +1,6 @@
 import json
 import mimetypes
 import os
-import re
 from wsgiref.util import FileWrapper
 import string
 from ctypes import windll
@@ -74,7 +73,8 @@ def list_videos(request):
     page = int(request.GET.get('page', 1))
     count = int(request.GET.get('count', 50))
     vinclude = request.GET.get('vinclude', 'all')
-    videos = getpipe(vinclude).list_videos(drives, page, count)
+    quality_filter = request.GET.get('quality_filter', 'all')
+    videos = getpipe(vinclude).list_videos(drives, page, count, quality_filter)
     return renderJSON({
         'videos': videos,
     })
@@ -88,7 +88,8 @@ def list_videos_by_term(request):
     page = int(request.GET.get('page', 1))
     count = int(request.GET.get('count', 50))
     vinclude = request.GET.get('vinclude', 'all')
-    videos = getpipe(vinclude).list_videos_by_term(drives, term, page, count)
+    quality_filter = request.GET.get('quality_filter', 'all')
+    videos = getpipe(vinclude).list_videos_by_term(drives, term, page, count, quality_filter)
     return renderJSON({
         'videos': videos,
     })
@@ -103,7 +104,8 @@ def list_videos_by_channel(request):
     page = int(request.GET.get('page', 1))
     count = int(request.GET.get('count', 50))
     vinclude = request.GET.get('vinclude', 'all')
-    videos = getpipe(vinclude).list_videos_by_channel(drives, channel_id, vchannelsort, page, count)
+    quality_filter = request.GET.get('quality_filter', 'all')
+    videos = getpipe(vinclude).list_videos_by_channel(drives, channel_id, vchannelsort, page, count, quality_filter)
     return renderJSON({
         'videos': videos,
     })

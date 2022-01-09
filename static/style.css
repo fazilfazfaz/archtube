@@ -20,6 +20,15 @@
     overflow: hidden;
 }
 
+.video-info .quality-label {
+    position: absolute;
+    background: black;
+    color: white;
+    font-size: 1em;
+    padding: 2px;
+}
+
+
 p.video-title {
     color: #fff;
     /* margin-bottom: 0; */
