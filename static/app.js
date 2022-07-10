@@ -23,6 +23,7 @@ faz = new Vue({
         vchannelsort: 'oldest',
         vchannellistsort: 'updated',
         quality_filter: 'all',
+        specificPage: 0,
     },
     watch: {
         quality_filter: function() {
@@ -276,6 +277,16 @@ faz = new Vue({
                 after_this: options.after_this
             });
         },
+        loadNextVideosSpecificPage: function(options) {
+            options = options || {};
+            this.page = this.specificPage;
+            this.stopVideo();
+            this.resetScrollTop();
+            this.listVideos({
+                after: options.after,
+                after_this: options.after_this
+            });
+        },
         loadPrevVideos: function(options) {
             if(this.page < 2) {
                 return;
@@ -417,9 +428,13 @@ faz = new Vue({
                 after_this: options.after_this
             });
         },
-        openChannelPage(channel) {
+        openChannelPage(channelId) {
             window.event.stopPropagation();
-            window.open('https://youtube.com/channel/' + channel['id'] + '/videos');
+            window.open('https://youtube.com/channel/' + channelId + '/videos');
+        },
+        openVideoPage(video) {
+            window.event.stopPropagation();
+            window.open('https://youtube.com/watch?v=' + video['info']['id']);
         },
     },
     mounted: function() {

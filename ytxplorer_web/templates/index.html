@@ -77,9 +77,12 @@
             <div class="row m-0">
                 <div v-on:click="playVideoAndSavePos(index)" class="col-md-3 video" v-for="(video, index) in videos">
                     <div class="video-info mx-auto">
-                        <div class="quality-label" v-if="video.codec">{% verbatim %}{{ video.codec.label }}{% endverbatim %}</div>
+                        <!-- <div class="quality-label" v-if="video.codec">{% verbatim %}{{ video.codec.label }}{% endverbatim %}</div> -->
                         <div :title="video.path" v-if="video.info" class="video-thumb"
-                             :style="{'backgroundImage': 'url(' + getThumbUrl(video) + ')'}"></div>
+                             :style="{'backgroundImage': 'url(' + getThumbUrl(video) + ')'}">
+                            <i class="fa fa-play m-2 text-white" v-on:click="openVideoPage(video)"></i>
+                            <i class="fa fa-info-circle m-2 text-white" v-on:click="openChannelPage(video['info']['snippet']['channelId'])"></i>
+                        </div>
                         <div :title="video.path" v-else-if="video.alt_thumb" class="video-thumb"
                              :style="{'backgroundImage': 'url(' + getAltThumbUrl(video) + ')'}"></div>
                         <p class="video-title" v-if="video.info">{% verbatim %}{{ video.info.snippet.title }}{% endverbatim %}</p>
@@ -93,6 +96,7 @@
                 <button type="button" class="btn btn-outline-success btn-dark btn-lg" style="margin-right: 10px"
                         v-on:click="loadPrevVideos">{% verbatim %}{{ 'Prev (' + (page - 1) + ')' }}{% endverbatim %}
                 </button>
+                <input class="form-control" id="page-number-input" v-on:change="loadNextVideosSpecificPage" v-model="specificPage">
                 <button type="button" class="btn btn-outline-success btn-dark btn-lg" v-on:click="loadNextVideos">{% verbatim %}{{ 'Next (' + (page + 1) + ')' }}{% endverbatim %}
                 </button>
                 <button type="button" class="btn btn-outline-success btn-dark btn-lg" v-on:click="loadNextVideos({skip: 5})">Next
@@ -104,7 +108,7 @@
                 <div class="col-md-3 channel" v-for="(channel, index) in channels">
                     <div class="channel-info mx-auto" v-on:click="triggerChannelSearch(index)">
                         <div class="video-thumb" :style="{'backgroundImage': 'url(' + channel['thumb'] + ')'}">
-                            <i class="fa fa-info-circle m-2 text-white" v-on:click="openChannelPage(channel)"></i>
+                            <i class="fa fa-info-circle m-2 text-white" v-on:click="openChannelPage(channel['id'])"></i>
                         </div>
                         <p class="channel-title">{% verbatim %}{{ channel.title }}{% endverbatim %}</p>
                     </div>

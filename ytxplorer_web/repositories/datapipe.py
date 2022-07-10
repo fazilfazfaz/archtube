@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import re
 
 
@@ -17,6 +18,12 @@ class DataPipe:
 
     # video ops
 
+    def get_info_file_absolute_path(self, drive):
+        if os.getenv('FAKE_DISKS') == 'True':
+            return os.path.join(os.getenv('FAKE_DISKS_FROM'), drive[0].lower())
+        else:
+            return os.path.join(drive, self.infofile)
+
     def load_videos(self, drives):
         if drives in self.videos:
             return
@@ -24,7 +31,7 @@ class DataPipe:
         self.videos[drives] = []
         for drive in drives.split(','):
             print('Caching {}'.format(drive))
-            infofilepath = os.path.join(drive, self.infofile)
+            infofilepath = self.get_info_file_absolute_path(drive)
             with open(infofilepath, 'r') as f:
                 if self.vinclude == 'yt':
                     self.videos[drives] += list(
@@ -36,7 +43,16 @@ class DataPipe:
                         filter(lambda x: 'alt_thumb' in x, json.loads(f.read()).get('videos')))
                 else:
                     self.videos[drives] += json.loads(f.read()).get('videos')
-                self.videos[drives].sort(key=lambda v: self.getctime(v['path']), reverse=True)
+                if os.getenv('FAKE_DISKS') == 'True':
+                    self.videos[drives].sort(
+                        key=lambda v: v['info']['snippet']['publishedAt'] if 'info' in v and v['info'] is not None else '1970-01-01T00:00:00.000Z', reverse=True)
+                else:
+                    self.videos[drives].sort(key=lambda v: self.getctime(v['path']), reverse=True)
+                if os.getenv('RANDOMIZE') == 'True':
+                    random.shuffle(self.videos[drives])
+        print("Total Videos: " + str(len(self.videos[drives])))
+        print("Total YT Videos: " + str(len(list(filter(lambda x: 'info' in x and x['info'] is not None, self.videos[drives])))))
+
 
     def load_videos_by_term(self, drives, term):
         if drives in self.videos_by_term and term in self.videos_by_term[drives]:
@@ -57,7 +73,10 @@ class DataPipe:
             self.videos_by_channel[drives][channel_id].sort(key=lambda v: v['info']['snippet']['publishedAt'],
                                                             reverse=True)
         elif sort == 'created':
-            self.videos_by_channel[drives][channel_id].sort(key=lambda v: self.getctime(v['path']), reverse=True)
+            if os.getenv('FAKE_DISKS') == 'True':
+                self.videos_by_channel[drives][channel_id].sort(key=lambda v: v['info']['snippet']['publishedAt'], reverse=True)
+            else:
+                self.videos_by_channel[drives][channel_id].sort(key=lambda v: self.getctime(v['path']), reverse=True)
 
     def load_videos_by_channel(self, drives, channel_id, vchannelsort):
         if drives in self.videos_by_channel and channel_id in self.videos_by_channel[drives]:
@@ -155,6 +174,8 @@ class DataPipe:
         return self.channels_by_term[drives][term][start:end]
 
     def getctime(self, path):
+        if os.getenv('FAKE_DISKS') == 'True':
+            return 0
         try:
             return os.path.getctime(path)
         except:

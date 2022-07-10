@@ -1,24 +1,24 @@
+import argparse
+import json
+import os
+import re
 import string
 import subprocess
 import time
 from ctypes import windll
-from functools import reduce
+from itertools import islice
 from threading import Thread
-from threading import enumerate as enumf
 
 import googleapiclient.discovery
 import googleapiclient.errors
-import argparse
-import os
-import re
-import json
-from itertools import islice
-
 import math
+from dotenv import dotenv_values
+
+config = dotenv_values('.env')
 
 api_service_name = 'youtube'
 api_version = 'v3'
-devKey = 'AIzaSyA5NrZQxvml_MivurIHbstNYLd38PxdWPQ'
+devKey = config['GOOGLE_KEY']
 logfile = '.ytcataloger.json'
 infofile = '.ytcataloger-info.json'
 
@@ -152,7 +152,8 @@ def process_videos_for_codec(videos, drive, gen_thumbs, startpaths):
 
 def process_videos(videos, drive, gen_thumbs, startpaths):
     videos_without_info = filter(lambda x: 'info' not in x and x['video_id'] is not None, videos)
-    videos_without_info = filter(lambda x: not os.path.exists(os.path.join(os.path.dirname(x['path']), '.nomedia')), videos_without_info)
+    videos_without_info = filter(lambda x: not os.path.exists(os.path.join(os.path.dirname(x['path']), '.nomedia')),
+                                 videos_without_info)
     video_chunks = chunk(videos_without_info, 50)
     remaining = len(videos)
 

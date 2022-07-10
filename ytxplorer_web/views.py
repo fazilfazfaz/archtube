@@ -9,11 +9,12 @@ from django.shortcuts import render
 from ytxplorer_web.repositories import datapipe
 from ytxplorer_web.utilities import renderJSON, range_re, RangeFileWrapper
 from django.http import HttpResponseBadRequest, FileResponse, StreamingHttpResponse
+from dotenv import load_dotenv
 
 allvideodatapipe = datapipe.DataPipe(vinclude='all')
 ytvideodatapipe = datapipe.DataPipe(vinclude='yt')
 nonytvideodatapipe = datapipe.DataPipe(vinclude='nonyt')
-
+load_dotenv()
 
 def getpipe(include):
     if include == 'yt':
@@ -29,11 +30,15 @@ def getpipe(include):
 def index(request):
     drives = []
     bitmask = windll.kernel32.GetLogicalDrives()
-    for letter in string.ascii_uppercase:
-        if bitmask & 1:
-            if os.path.isfile(os.path.join(letter + ':\\', '.ytcataloger.json')):
-                drives.append(letter + ':')
-        bitmask >>= 1
+    if os.getenv('FAKE_DISKS') == 'True':
+        for drive in os.listdir(os.getenv('FAKE_DISKS_FROM')):
+            drives.append(drive.upper() + ':')
+    else:
+        for letter in string.ascii_uppercase:
+            if bitmask & 1:
+                if os.path.isfile(os.path.join(letter + ':\\', '.ytcataloger.json')):
+                    drives.append(letter + ':')
+            bitmask >>= 1
     print(drives)
     return render(request, 'index.html', {
         'drives': json.dumps(','.join(drives))
@@ -142,6 +147,8 @@ def subs(request):
     if 'sub' not in request.GET:
         return HttpResponseBadRequest()
     sub = request.GET.get('sub')
+    if not os.path.exists(sub):
+        return HttpResponseBadRequest()
     size = os.path.getsize(sub)
     resp = StreamingHttpResponse(FileWrapper(open(sub, 'rb')), content_type='text/vtt')
     resp['Content-Length'] = str(size)

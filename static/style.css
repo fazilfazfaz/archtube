@@ -105,3 +105,9 @@ div#play-buttons-container {
     right: 25px;
     z-index: 3;
 }
+
+#page-number-input {
+    max-width: 100px;
+    display: inline-block;
+    margin-right: 8px;
+}
